@@ -19,8 +19,5 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ],
-  "dependencies": {
-    "tsdx": "^0.14.1"
-  }
+  ]
 }
