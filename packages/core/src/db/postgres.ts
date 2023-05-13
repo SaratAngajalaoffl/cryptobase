@@ -38,7 +38,11 @@ export class PostgresDatabase extends Database {
 
   private createDbIfDoesntExist = async (database: string) => {
     // Use the connection pool to create the database if it doesn't exist
-    return this.pool.query(`CREATE DATABASE ${database};`);
+    try {
+      await this.pool.query(`CREATE DATABASE ${database};`);
+    } catch (err) {
+      console.log(`Db '${database}' already exists`);
+    }
   };
 
   public static createConnection = async (config?: PostgresDatabaseConfig) => {
@@ -58,11 +62,11 @@ export class PostgresDatabase extends Database {
     // get the entity manager
     const entityManager = this.connection.manager;
 
-    console.log(`CREATE TABLE ${tableName} (id SERIAL PRIMARY KEY);`);
-
-    await entityManager.query(
-      `CREATE TABLE ${tableName} (id SERIAL PRIMARY KEY);`
-    );
+    try {
+      await entityManager.query(`CREATE TABLE ${tableName} (id SERIAL PRIMARY KEY);`);
+    } catch (err) {
+      // console.log(err);
+    }
   };
 
   addColumn = async (tableName: string, column: ColumnConfig) => {
@@ -73,10 +77,10 @@ export class PostgresDatabase extends Database {
 
     const query = `ALTER TABLE ${tableName} ADD COLUMN ${columnDefinition}`;
 
-    console.log(query);
-
     // create a new entity dynamically
-    await entityManager.query(query);
+    try {
+      await entityManager.query(query);
+    } catch (err) {}
   };
 
   close = async () => {
@@ -84,9 +88,7 @@ export class PostgresDatabase extends Database {
   };
 
   private getColumnDefinition = (column: ColumnConfig) => {
-    return `${column.name} ${this.getCorrespondingDataTypeForKey(
-      column.type
-    )} ${column.strictNoNull ? "NOT NULL" : ""}`;
+    return `${column.name} ${this.getCorrespondingDataTypeForKey(column.type)} ${column.strictNoNull ? "NOT NULL" : ""}`;
   };
 
   private getCorrespondingDataTypeForKey = (key: string) => {
