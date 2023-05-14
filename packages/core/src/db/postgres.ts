@@ -16,10 +16,13 @@ const DEFAULT_CONFIG: PostgresDatabaseConfig = {
 
 export class PostgresDatabase extends Database {
   private connection: DataSource;
-  private pool: Pool;
+  public pool: Pool;
+  public config: PostgresDatabaseConfig;
 
   constructor(databaseConfig: PostgresDatabaseConfig) {
     super();
+
+    this.config = databaseConfig;
 
     this.pool = new Pool({
       host: databaseConfig.host,
@@ -37,54 +40,11 @@ export class PostgresDatabase extends Database {
   }
 
   private createDbIfDoesntExist = async (database: string) => {
-    // Use the connection pool to create the database if it doesn't exist
     try {
       await this.pool.query(`CREATE DATABASE ${database};`);
     } catch (err) {
       console.log(`Db '${database}' already exists`);
     }
-  };
-
-  public static createConnection = async (config?: PostgresDatabaseConfig) => {
-    const dbConf = config || DEFAULT_CONFIG;
-
-    const db = new PostgresDatabase(dbConf);
-
-    await db.createDbIfDoesntExist(dbConf.database);
-
-    db.connection = await db.connection.initialize();
-
-    return db;
-  };
-
-  // TODO: check if table already exists before creating
-  createTable = async (tableName: string) => {
-    // get the entity manager
-    const entityManager = this.connection.manager;
-
-    try {
-      await entityManager.query(`CREATE TABLE ${tableName} (id SERIAL PRIMARY KEY);`);
-    } catch (err) {
-      // console.log(err);
-    }
-  };
-
-  addColumn = async (tableName: string, column: ColumnConfig) => {
-    // get the entity manager
-    const entityManager = this.connection.manager;
-
-    const columnDefinition = this.getColumnDefinition(column);
-
-    const query = `ALTER TABLE ${tableName} ADD COLUMN ${columnDefinition}`;
-
-    // create a new entity dynamically
-    try {
-      await entityManager.query(query);
-    } catch (err) {}
-  };
-
-  close = async () => {
-    this.connection.destroy();
   };
 
   private getColumnDefinition = (column: ColumnConfig) => {
@@ -100,5 +60,45 @@ export class PostgresDatabase extends Database {
       default:
         throw Error("Type not valid!");
     }
+  };
+
+  // Establishes a new connection to the database using the given config. If the database doesn't exist, it create one
+  public static createConnection = async (config?: PostgresDatabaseConfig) => {
+    const dbConf = config || DEFAULT_CONFIG;
+
+    const db = new PostgresDatabase(dbConf);
+
+    await db.createDbIfDoesntExist(dbConf.database);
+
+    db.connection = await db.connection.initialize();
+
+    return db;
+  };
+
+  // Creates a table on the current connection. If table already exists, throws an error
+  createTable = async (tableName: string) => {
+    try {
+      const entityManager = this.connection.manager;
+
+      await entityManager.query(`CREATE TABLE ${tableName} (id SERIAL PRIMARY KEY);`);
+    } catch (err) {
+      throw new Error(`Table '${tableName}' already exists`);
+    }
+  };
+
+  addColumn = async (tableName: string, column: ColumnConfig) => {
+    // get the entity manager
+    const entityManager = this.connection.manager;
+
+    const columnDefinition = this.getColumnDefinition(column);
+
+    const query = `ALTER TABLE ${tableName} ADD COLUMN ${columnDefinition}`;
+
+    // create a new entity dynamically
+    await entityManager.query(query);
+  };
+
+  close = async () => {
+    this.connection.destroy();
   };
 }
